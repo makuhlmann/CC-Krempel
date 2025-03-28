@@ -2,6 +2,7 @@ local pack = ...
 
 local standard_bin = {
     "/disk/utilities/cat.lua",
+    "/disk/utilities/df.lua",
     "/disk/utilities/touch.lua",
     "/disk/utilities/whereis.lua",
     "/disk/services/svcman.lua",
@@ -167,7 +168,7 @@ print("")
 print(" all             Install everything below")
 print("")
 print(" standard        Standard Pack, including:")
-print("                 - Unix like tools (cat, touch, whereis)")
+print("                 - Unix like tools (cat, df, touch, whereis)")
 print("                 - Service manager (svcman)")
 print("                 - Networking service & utilities (ping)")
 print("")
