@@ -121,6 +121,7 @@ function svcman.list_services()
     return
   end
   write(" Service\t\t\tStatus\n\r-------------------------\n\r" .. output)
+  print("")
 end
 
 

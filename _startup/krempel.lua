@@ -10,3 +10,4 @@ shell.setCompletionFunction("bin/svcman.lua", completion.build({ completion.choi
 
 shell.setAlias("del", "delete")
 shell.setAlias("rm", "delete")
+shell.setAlias("service", "svcman")
