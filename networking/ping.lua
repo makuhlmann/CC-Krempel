@@ -1,4 +1,4 @@
-local network = require("network")
+local network = require("/lib/network")
 local pings = {}
 local pongs = {}
 local limit
@@ -44,8 +44,11 @@ local function send_pings()
     while not terminated and limit ~= 0 do
         limit = limit - 1
         local send_time = os.epoch("ingame")
-        network.send_packet(net, id, "ping", send_time)
+        local result = network.send_packet(net, id, "ping", send_time)
         table.insert(pings, send_time)
+        if result == false then
+            print("No route found for target " .. net .. "-" .. id)
+        end
         safe_sleep(1)
     end
     finish()

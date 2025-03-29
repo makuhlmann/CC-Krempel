@@ -49,6 +49,7 @@ function network.send_packet(dest_net, dest_id, protocol, payload, side)
     if side == nil then
         side = network.find_best_side(dest_net)
         if side == nil then
+            if debug then print("[send_packet] no route found") end
             return false
         end
         if debug then print("[send_packet] found best side " .. side) end
@@ -114,7 +115,7 @@ function network.init_modem(name, wrapped)
         if debug then print("[parse_modem_message] loading driver " .. name) end
         _G.network_devices.device[name].driver["instance"] = require(_G.network_devices.device[name].driver["name"])
         _G.network_devices.device[name].modem = wrapped
-        _G.network_devices.device[name].driver["instance"].init_modem()
+        _G.network_devices.device[name].driver["instance"].init_modem(debug)
     else
         if not wrapped.isWireless() then
             if debug then print("[parse_modem_message] load cable modem w/o driver " .. name) end
@@ -150,6 +151,7 @@ function network.parse_modem_message(event)
 
             if protocol == "discovery_req" then
                 for _, route in ipairs(_G.network_devices.device[side].routes) do
+                    if debug then print("[parse_modem_message/routing] discovery_req answered") end
                     network.send_packet(src_net, src_id, "discovery_ack", { ["network"] = route, ["routes"] = { 0 } }, side)
                 end
                 return
