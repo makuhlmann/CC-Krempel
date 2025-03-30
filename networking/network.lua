@@ -1,6 +1,6 @@
 local expect = require "cc.expect".expect
 local network = { terminated = false }
-local default_conf = { modem = nil, network = 0, static = false, driver = { name = nil, instance = nil, data = nil }, routes = {}, max_hops = 20 }
+local default_conf = { modem = nil, network = 0, static = false, driver = { name = nil, instance = nil, data = {} }, routes = {}, max_hops = 20 }
 local debug = false
 
 function network.sleep(nTime)
@@ -18,14 +18,16 @@ function network.find_best_side(dest_net)
     if debug then print("[find_best_side] start") end
     local first_default_device = nil
     for side, device in pairs(_G.network_devices.device) do
-        for _, route in ipairs(device.routes) do
-            if route == dest_net then
-                if debug then print("[find_best_side] found direct side" .. side) end
-                return side
-            end
-            if route == 0 and first_default_device == nil then
-                if debug then print("[find_best_side] found default side" .. side) end
-                first_default_device = side
+        if device.modem ~= nil then
+            for _, route in ipairs(device.routes) do
+                if route == dest_net then
+                    if debug then print("[find_best_side] found direct side " .. side) end
+                    return side
+                end
+                if route == 0 and first_default_device == nil then
+                    if debug then print("[find_best_side] found default side " .. side) end
+                    first_default_device = side
+                end
             end
         end
     end
@@ -107,18 +109,21 @@ function network.init_modem(name, wrapped)
     expect(1, name, "string")
     expect(2, wrapped, "table")
 
-    if debug then print("[parse_modem_message] start " .. name) end
+    if debug then print("[init_modem] start " .. name) end
     if _G.network_devices.device[name] == nil then
         _G.network_devices.device[name] = default_conf
     end
     if _G.network_devices.device[name].driver["name"] ~= nil then
-        if debug then print("[parse_modem_message] loading driver " .. name) end
+        if debug then print("[init_modem] loading driver " .. name) end
         _G.network_devices.device[name].driver["instance"] = require(_G.network_devices.device[name].driver["name"])
         _G.network_devices.device[name].modem = wrapped
-        _G.network_devices.device[name].driver["instance"].init_modem(debug)
+        if _G.network_devices.device[name].driver["data"] == nil then
+            _G.network_devices.device[name].driver["data"] = {}
+        end
+        _G.network_devices.device[name].driver["instance"].init_modem(name, debug)
     else
         if not wrapped.isWireless() then
-            if debug then print("[parse_modem_message] load cable modem w/o driver " .. name) end
+            if debug then print("[init_modem] load cable modem w/o driver " .. name) end
             _G.network_devices.device[name].modem = wrapped
             _G.network_devices.device[name].modem.open(0)
         end
@@ -146,7 +151,7 @@ function network.parse_modem_message(event)
         local protocol = message[7]
         local payload = message[8]
 
-        if (dest_net ~= _G.network_devices.device[side].network or dest_id ~= os.getComputerID()) and _G.network_devices.settings.router then
+        if dest_net ~= _G.network_devices.device[side].network and _G.network_devices.settings.router then
             if debug then print("[parse_modem_message/routing] start") end
 
             if protocol == "discovery_req" then
@@ -179,12 +184,18 @@ function network.parse_modem_message(event)
             if _G.network_devices.device[route_side].driver["instance"] ~= nil then
                 -- Let the driver handle the sending and return the result
                 if debug then print("[parse_modem_message/routing] passing to driver") end
-                return _G.network_devices.device[route_side].driver["instance"].send_packet_raw(message, route_side)
+                _G.network_devices.device[route_side].driver["instance"].send_packet_raw(route_side, message)
+                return
             end
 
             _G.network_devices.device[route_side].modem.transmit(0, 0, message)
 
             if debug then print("[parse_modem_message/routing] done") end
+            return
+        end
+
+        if dest_id ~= os.getComputerID() then
+            if debug then print("[parse_modem_message] packet not for me, discard") end
             return
         end
 
@@ -301,7 +312,7 @@ function network.event_listener_task()
                 if event[1] ~= "terminate" then
                     local side = event[2]
                     if _G.network_devices.device[side].driver["instance"] ~= nil then
-                        _G.network_devices.device[side].driver["instance"].parse_modem_message(event, network.parse_modem_message)
+                        _G.network_devices.device[side].driver["instance"].parse_modem_message(side, event, network.parse_modem_message)
                     else
                         network.parse_modem_message(event)
                     end

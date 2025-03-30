@@ -1,4 +1,7 @@
-local pack = ...
+local args = {...}
+
+local pack = nil
+local target_path = ""
 
 local standard_bin = {
     "/disk/utilities/cat.lua",
@@ -11,7 +14,9 @@ local standard_bin = {
 
 local standard_lib = {
     "/disk/services/redrun.lua",
-    "/disk/networking/network.lua"
+    "/disk/networking/network.lua",
+    "/disk/networking/wireless.lua",
+    "/disk/networking/wireless_dummy.lua"
 }
 
 local standard_startup = {
@@ -35,6 +40,7 @@ local function create_folders()
 end
 
 local function copy_programs(folder, programs)
+    folder = target_path .. folder
     for _, program in pairs(programs) do
         local file_name = fs.getName(program)
         if fs.exists(folder .. "/" .. file_name) then
@@ -48,22 +54,22 @@ end
 local function prepare_startup()
     print("Setting up startup environment...")
 
-    if fs.exists("/startup") and not fs.isDir("/startup") then
-        fs.move("/startup", "/startup.temp")
+    if fs.exists(target_path .. "/startup") and not fs.isDir(target_path .. "/startup") then
+        fs.move(target_path .. "/startup", target_path .. "/startup.temp")
     end
 
-    if not fs.exists("/startup") then
-        fs.makeDir("/startup")
+    if not fs.exists(target_path .. "/startup") then
+        fs.makeDir(target_path .. "/startup")
     end
 
-    if fs.exists("/startup.temp") and not fs.exists("/startup/00_startup") then
+    if fs.exists(target_path .. "/startup.temp") and not fs.exists(target_path .. "/startup/00_startup") then
         print("Moved /startup to /startup/00_startup")
-        fs.move("/startup.temp", "/startup/00_startup")
+        fs.move(target_path .. "/startup.temp", target_path .. "/startup/00_startup")
     end
 
-    if fs.exists("startup.lua") and not fs.exists("/startup/00_startup.lua") then
+    if fs.exists(target_path .. "startup.lua") and not fs.exists(target_path .. "/startup/00_startup.lua") then
         print("Moved /startup.lua to /startup/00_startup.lua")
-        fs.move("/startup.lua", "/startup/00_startup.lua")
+        fs.move(target_path .. "/startup.lua", target_path .. "/startup/00_startup.lua")
     end
 end
 
@@ -101,6 +107,10 @@ end
 
 local function install_mbs()
     local url = "https://raw.githubusercontent.com/SquidDev-CC/mbs/master/mbs.lua"
+    if target_path ~= "" then
+        print("Target installation of MBS not supported, skipping")
+        return
+    end
     if fs.exists("/.mbs") then
         print("MBS already installed, skipping")
         return
@@ -130,6 +140,13 @@ local function install_mbs()
     shell.run("/.mbs/mbs.lua", "install")
 
     print("Installation of MBS completed")
+end
+
+if args ~= nil then
+    pack = args[1]
+    if args[2] ~= nil then
+        target_path = args[2]
+    end
 end
 
 print(" == Setup of CC-Krempel ==")
@@ -162,7 +179,7 @@ if pack == "all" then
     return
 end
 
-print("Usage: setup [bundle]")
+print("Usage: setup <bundle> [target]")
 print("Choose one of the following bundles:")
 print("")
 print(" all             Install everything below")
@@ -179,4 +196,5 @@ print("")
 print(" mbs             Mildly Better Shell (MBS)")
 print("                 - 3rd-party software by SquidDev-CC")
 print("                 - Internet access required")
+print("                 - Path installation not supported")
 print("")
