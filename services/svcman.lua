@@ -131,6 +131,7 @@ function svcman.disable_service(name)
       svcsettings.autorun[k] = nil
       print("Service has been disabled")
       settings.set("svcman.settings", svcsettings)
+      settings.save()
       return 0
     end
   end
@@ -156,6 +157,7 @@ function svcman.enable_service(name)
     svcsettings.autorun[name] = path
     print("Service has been enabled")
     settings.set("svcman.settings", svcsettings)
+    settings.save()
     return 0
   end
   return 1

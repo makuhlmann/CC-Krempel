@@ -1,6 +1,6 @@
 local expect = require "cc.expect".expect
 local network = { terminated = false }
-local default_conf = { modem = nil, network = 0, static = false, driver = { name = nil, instance = nil, data = {} }, routes = {}, max_hops = 20 }
+local default_conf = { modem = nil, network = 0, static = false, driver = { name = nil, instance = nil, data = {} }, routes = {}, max_hops = 20, autodiscover = false }
 local debug = false
 
 function network.sleep(nTime)
@@ -60,7 +60,7 @@ function network.send_packet(dest_net, dest_id, protocol, payload, side)
     if _G.network_devices.device[side].driver["instance"] ~= nil then
         -- Let the driver handle the sending and return the result
         if debug then print("[send_packet] passing to driver") end
-        return _G.network_devices.device[side].driver["instance"].send_packet(dest_net, dest_id, protocol, payload, side)
+        return _G.network_devices.device[side].driver["instance"].send_packet(dest_net, dest_id, protocol, payload)
     end
     _G.network_devices.device[side].modem.transmit(0, 0, { 
         _G.network_devices.device[side].network,   -- Source Network
@@ -134,7 +134,7 @@ end
 function network.parse_modem_message(event)
     expect(1, event, "table")
 
-    if debug then print("[parse_modem_message] start") end
+    if debug then print("[parse_modem_message] start - message from " .. event[2]) end
     local side = event[2]
     local message = event[5]
     local distance = event[6]
@@ -151,13 +151,17 @@ function network.parse_modem_message(event)
         local protocol = message[7]
         local payload = message[8]
 
+        if debug then print("[parse_modem_message] from " .. src_net .. "-" .. src_id .. " to " .. dest_net .. "-" .. dest_id) end
+
         if dest_net ~= _G.network_devices.device[side].network and _G.network_devices.settings.router then
             if debug then print("[parse_modem_message/routing] start") end
 
             if protocol == "discovery_req" then
-                for _, route in ipairs(_G.network_devices.device[side].routes) do
-                    if debug then print("[parse_modem_message/routing] discovery_req answered") end
-                    network.send_packet(src_net, src_id, "discovery_ack", { ["network"] = route, ["routes"] = { 0 } }, side)
+                if _G.network_devices.device[side].autodiscover then
+                    for _, route in ipairs(_G.network_devices.device[side].routes) do
+                        if debug then print("[parse_modem_message/routing] discovery_req answered") end
+                        network.send_packet(src_net, src_id, "discovery_ack", { ["network"] = route, ["routes"] = { 0 } }, side)
+                    end
                 end
                 return
             end
@@ -179,12 +183,17 @@ function network.parse_modem_message(event)
                 return
             end
 
+            if route_side == side then
+                if debug then print("[parse_modem_message/routing] discard packet as we got no route") end
+                return
+            end
+
             if debug then print("[parse_modem_message/routing] found best side " .. route_side) end
 
             if _G.network_devices.device[route_side].driver["instance"] ~= nil then
                 -- Let the driver handle the sending and return the result
                 if debug then print("[parse_modem_message/routing] passing to driver") end
-                _G.network_devices.device[route_side].driver["instance"].send_packet_raw(route_side, message)
+                _G.network_devices.device[route_side].driver["instance"].send_packet_raw(message)
                 return
             end
 
@@ -312,7 +321,7 @@ function network.event_listener_task()
                 if event[1] ~= "terminate" then
                     local side = event[2]
                     if _G.network_devices.device[side].driver["instance"] ~= nil then
-                        _G.network_devices.device[side].driver["instance"].parse_modem_message(side, event, network.parse_modem_message)
+                        _G.network_devices.device[side].driver["instance"].parse_modem_message(event, network.parse_modem_message)
                     else
                         network.parse_modem_message(event)
                     end
